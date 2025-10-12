@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -8,13 +8,11 @@ import {
   Tabs,
   Tab,
   Box,
+  Button,
 } from '@mui/material';
-import MyProfileSimple from './components/MyProfileSimple';
-import MyTeamSimple from './components/MyTeamSimple';
-import DirectoriesSimple from './components/DirectoriesSimple';
-// import MyProfile from './components/MyProfile';
-// import MyTeam from './components/MyTeam';
-// import Directories from './components/Directories';
+import MyProfile from './components/MyProfile';
+import MyTeam from './components/MyTeam';
+import Directories from './components/Directories';
 
 // Компонент для обработки ошибок
 class ErrorBoundary extends React.Component {
@@ -49,14 +47,14 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function App() {
+const App = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [currentTab, setCurrentTab] = useState(0);
   const [error, setError] = useState(null);
 
   // Обработка ошибок
-  React.useEffect(() => {
+  useEffect(() => {
     const handleError = (error) => {
       console.error('App Error:', error);
       setError(error.message);
@@ -68,27 +66,19 @@ function App() {
 
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
-    switch (newValue) {
-      case 0:
-        navigate('/profile');
-        break;
-      case 1:
-        navigate('/team');
-        break;
-      case 2:
-        navigate('/directories');
-        break;
-      default:
-        navigate('/profile');
-    }
+    const routes = ['/profile', '/team', '/directories'];
+    navigate(routes[newValue] || '/profile');
   };
 
   // Определяем текущую вкладку на основе URL
-  React.useEffect(() => {
+  useEffect(() => {
     const path = location.pathname;
-    if (path === '/profile') setCurrentTab(0);
-    else if (path === '/team') setCurrentTab(1);
-    else if (path === '/directories') setCurrentTab(2);
+    const tabMap = {
+      '/profile': 0,
+      '/team': 1,
+      '/directories': 2,
+    };
+    setCurrentTab(tabMap[path] || 0);
   }, [location.pathname]);
 
   if (error) {
@@ -139,14 +129,14 @@ function App() {
         }}
       >
         <Routes>
-          <Route path="/" element={<ErrorBoundary><MyProfileSimple /></ErrorBoundary>} />
-          <Route path="/profile" element={<ErrorBoundary><MyProfileSimple /></ErrorBoundary>} />
-          <Route path="/team" element={<ErrorBoundary><MyTeamSimple /></ErrorBoundary>} />
-          <Route path="/directories" element={<ErrorBoundary><DirectoriesSimple /></ErrorBoundary>} />
+          <Route path="/" element={<ErrorBoundary><MyProfile /></ErrorBoundary>} />
+          <Route path="/profile" element={<ErrorBoundary><MyProfile /></ErrorBoundary>} />
+          <Route path="/team" element={<ErrorBoundary><MyTeam /></ErrorBoundary>} />
+          <Route path="/directories" element={<ErrorBoundary><Directories /></ErrorBoundary>} />
         </Routes>
       </Container>
     </Box>
   );
-}
+};
 
 export default App;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -38,6 +38,8 @@ import { defaultCareerTracks } from '../data/careerTracks';
 import NotificationSnackbar from './common/NotificationSnackbar';
 
 const MyProfile = () => {
+  console.log('MyProfile: Компонент инициализируется');
+  
   const [selectedProfile, setSelectedProfile] = useState('');
   const [availableProfiles, setAvailableProfiles] = useState([]);
   const [careerTracks, setCareerTracks] = useState([]);
@@ -50,6 +52,13 @@ const MyProfile = () => {
   const [careerTrackDialogOpen, setCareerTrackDialogOpen] = useState(false);
   const { snackbarOpen, snackbarMessage, showSnackbar, hideSnackbar } = useSnackbar();
 
+  console.log('MyProfile: Состояния инициализированы', {
+    selectedProfile,
+    availableProfiles: availableProfiles?.length,
+    careerTracks: careerTracks?.length,
+    userProfile
+  });
+
   // Загружаем данные
   useEffect(() => {
     try {
@@ -58,11 +67,26 @@ const MyProfile = () => {
       console.error('Error in useEffect:', error);
       showSnackbar('Ошибка при инициализации компонента');
     }
-  }, []);
+  }, [loadData, showSnackbar]);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     try {
       console.log('MyProfile: Загрузка данных...');
+      console.log('defaultProfiles:', defaultProfiles);
+      console.log('defaultCareerTracks:', defaultCareerTracks);
+      
+      // Проверяем, что данные импортированы правильно
+      if (!defaultProfiles || !Array.isArray(defaultProfiles)) {
+        console.error('defaultProfiles не определен или не является массивом');
+        showSnackbar('Ошибка: данные профилей не загружены');
+        return;
+      }
+      
+      if (!defaultCareerTracks || !Array.isArray(defaultCareerTracks)) {
+        console.error('defaultCareerTracks не определен или не является массивом');
+        showSnackbar('Ошибка: данные карьерных треков не загружены');
+        return;
+      }
       
       // Загружаем доступные профили
       const savedProfiles = loadFromStorage(STORAGE_KEYS.PROFILES);
@@ -106,13 +130,13 @@ const MyProfile = () => {
       console.error('Error loading data:', error);
       showSnackbar('Ошибка при загрузке данных');
     }
-  };
+  }, [showSnackbar]);
 
   const handleProfileChange = (event) => {
     setSelectedProfile(event.target.value);
   };
 
-  const handleSetMainProfile = (profileId) => {
+  const handleSetMainProfile = useCallback((profileId) => {
     const profile = availableProfiles.find(p => p.id === profileId);
     if (profile) {
       const updatedProfile = {
@@ -123,18 +147,23 @@ const MyProfile = () => {
       saveToStorage(STORAGE_KEYS.USER_PROFILE, updatedProfile);
       showSnackbar('Основной профиль установлен!');
     }
-  };
+  }, [availableProfiles, userProfile, showSnackbar]);
 
-  const handleAddAdditionalProfile = () => {
+  const handleAddAdditionalProfile = useCallback(() => {
     if (!selectedProfile) {
       showSnackbar('Пожалуйста, выберите профиль');
+      return;
+    }
+
+    if (!userProfile) {
+      showSnackbar('Ошибка: профиль не загружен');
       return;
     }
 
     const profile = availableProfiles.find(p => p.id === selectedProfile);
     if (profile) {
       // Проверяем, что профиль не является основным и не добавлен как дополнительный
-      if (userProfile.mainProfile?.id === profile.id) {
+      if (userProfile?.mainProfile?.id === profile.id) {
         showSnackbar('Этот профиль уже является основным');
         return;
       }
@@ -158,9 +187,14 @@ const MyProfile = () => {
       showSnackbar('Дополнительный профиль добавлен!');
       setSelectedProfile('');
     }
-  };
+  }, [selectedProfile, availableProfiles, userProfile, showSnackbar]);
 
-  const handleRemoveAdditionalProfile = (profileId) => {
+  const handleRemoveAdditionalProfile = useCallback((profileId) => {
+    if (!userProfile) {
+      showSnackbar('Ошибка: профиль не загружен');
+      return;
+    }
+
     const updatedProfile = {
       ...userProfile,
       additionalProfiles: userProfile.additionalProfiles.filter(p => p.id !== profileId)
@@ -168,7 +202,7 @@ const MyProfile = () => {
     setUserProfile(updatedProfile);
     saveToStorage(STORAGE_KEYS.USER_PROFILE, updatedProfile);
     showSnackbar('Дополнительный профиль удален');
-  };
+  }, [userProfile, showSnackbar]);
 
   const handleSelectCareerTrack = (careerTrack) => {
     try {
@@ -187,6 +221,20 @@ const MyProfile = () => {
         return;
       }
 
+      if (!userProfile.mainProfile) {
+        console.error('Main profile is not selected');
+        showSnackbar('Ошибка: сначала выберите основной профиль');
+        return;
+      }
+
+      // Проверяем, что карьерный трек совместим с профилем
+      const isCompatible = getAvailableCareerTracks().some(track => track.id === careerTrack.id);
+      if (!isCompatible) {
+        console.error('Career track is not compatible with current profile');
+        showSnackbar('Ошибка: выбранный карьерный трек не совместим с текущим профилем');
+        return;
+      }
+
       const updatedProfile = {
         ...userProfile,
         selectedCareerTrack: careerTrack,
@@ -197,11 +245,34 @@ const MyProfile = () => {
       
       setUserProfile(updatedProfile);
       saveToStorage(STORAGE_KEYS.USER_PROFILE, updatedProfile);
-      showSnackbar('Карьерный трек выбран!');
+      showSnackbar(`Карьерный трек "${careerTrack.name}" выбран!`);
       setCareerTrackDialogOpen(false);
     } catch (error) {
       console.error('Error in handleSelectCareerTrack:', error);
       showSnackbar('Ошибка при выборе карьерного трека');
+    }
+  };
+
+  const handleResetCareerTrack = () => {
+    try {
+      if (!userProfile) {
+        console.error('User profile is null or undefined');
+        showSnackbar('Ошибка: профиль пользователя не загружен');
+        return;
+      }
+
+      const updatedProfile = {
+        ...userProfile,
+        selectedCareerTrack: null,
+        currentLevel: 1
+      };
+
+      setUserProfile(updatedProfile);
+      saveToStorage(STORAGE_KEYS.USER_PROFILE, updatedProfile);
+      showSnackbar('Карьерный трек сброшен');
+    } catch (error) {
+      console.error('Error in handleResetCareerTrack:', error);
+      showSnackbar('Ошибка при сбросе карьерного трека');
     }
   };
 
@@ -256,21 +327,51 @@ const MyProfile = () => {
   };
 
   const getAvailableCareerTracks = () => {
-    if (!userProfile.mainProfile) return [];
+    if (!userProfile || !userProfile?.mainProfile) return [];
     
     try {
-      // Фильтруем карьерные треки по основному профилю
-      return careerTracks.filter(track => 
-        track.name.toLowerCase().includes(userProfile.mainProfile.name.toLowerCase()) ||
-        track.requirements?.some(req => 
-          userProfile.mainProfile.name.toLowerCase().includes(req.toLowerCase())
-        )
-      );
+      console.log('Filtering career tracks for profile:', userProfile.mainProfile.name);
+      console.log('Available career tracks:', careerTracks);
+      
+      // Более гибкая фильтрация карьерных треков
+      const filteredTracks = careerTracks.filter(track => {
+        const profileName = userProfile.mainProfile.name.toLowerCase();
+        const trackName = track.name.toLowerCase();
+        
+        // Проверяем совпадение по названию профиля и трека
+        const nameMatch = trackName.includes(profileName) || profileName.includes(trackName);
+        
+        // Проверяем требования трека
+        const requirementsMatch = track.requirements?.some(req => {
+          const reqLower = req.toLowerCase();
+          return profileName.includes(reqLower) || reqLower.includes(profileName);
+        });
+        
+        // Проверяем общие ключевые слова
+        const commonKeywords = ['разработчик', 'developer', 'backend', 'frontend', 'fullstack'];
+        const keywordMatch = commonKeywords.some(keyword => 
+          profileName.includes(keyword) && trackName.includes(keyword)
+        );
+        
+        return nameMatch || requirementsMatch || keywordMatch;
+      });
+      
+      console.log('Filtered career tracks:', filteredTracks);
+      return filteredTracks;
     } catch (error) {
       console.error('Error in getAvailableCareerTracks:', error);
       return [];
     }
   };
+
+  // Проверяем, что все данные загружены
+  if (!userProfile || !availableProfiles || !careerTracks) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+        <Typography variant="h6">Загрузка данных...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -303,18 +404,18 @@ const MyProfile = () => {
                 </Typography>
               </Box>
               
-              {userProfile.mainProfile ? (
+              {userProfile && userProfile?.mainProfile ? (
                 <Paper sx={{ p: 2, bgcolor: 'primary.50', border: '1px solid', borderColor: 'primary.200' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box>
                       <Typography variant="subtitle1" fontWeight="bold">
-                        {userProfile.mainProfile.name}
+                        {userProfile?.mainProfile?.name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {userProfile.mainProfile.description}
+                        {userProfile?.mainProfile?.description}
                       </Typography>
                       <Chip 
-                        label={userProfile.mainProfile.category} 
+                        label={userProfile?.mainProfile?.category} 
                         size="small" 
                         color="primary" 
                         variant="outlined"
@@ -380,7 +481,7 @@ const MyProfile = () => {
                   Дополнительные профили
                 </Typography>
                 <Chip 
-                  label={`${userProfile.additionalProfiles.length}/${MAX_ADDITIONAL_PROFILES}`} 
+                  label={`${userProfile?.additionalProfiles?.length || 0}/${MAX_ADDITIONAL_PROFILES}`} 
                   size="small" 
                   color="secondary" 
                   variant="outlined"
@@ -388,9 +489,9 @@ const MyProfile = () => {
                 />
               </Box>
 
-              {userProfile.additionalProfiles.length > 0 && (
+              {userProfile?.additionalProfiles?.length > 0 && (
                 <Box sx={{ mb: 2 }}>
-                  {userProfile.additionalProfiles.map((profile) => (
+                  {userProfile?.additionalProfiles?.map((profile) => (
                     <Paper key={profile.id} sx={{ p: 1, mb: 1, bgcolor: 'secondary.50', border: '1px solid', borderColor: 'secondary.200' }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Box>
@@ -414,7 +515,7 @@ const MyProfile = () => {
                 </Box>
               )}
 
-              {userProfile.additionalProfiles.length < MAX_ADDITIONAL_PROFILES && (
+              {userProfile?.additionalProfiles?.length < MAX_ADDITIONAL_PROFILES && (
                 <Box>
                   <FormControl fullWidth margin="normal">
                     <InputLabel>Добавить дополнительный профиль</InputLabel>
@@ -425,8 +526,8 @@ const MyProfile = () => {
                     >
                       {availableProfiles
                         .filter(profile => 
-                          profile.id !== userProfile.mainProfile?.id &&
-                          !userProfile.additionalProfiles.find(p => p.id === profile.id)
+                          profile.id !== userProfile?.mainProfile?.id &&
+                          !userProfile?.additionalProfiles?.find(p => p.id === profile.id)
                         )
                         .map((profile) => (
                           <MenuItem key={profile.id} value={profile.id}>
@@ -462,7 +563,7 @@ const MyProfile = () => {
                 </Typography>
               </Box>
 
-              {userProfile.mainProfile ? (
+              {userProfile && userProfile?.mainProfile ? (
                 <Box>
                   {userProfile.selectedCareerTrack ? (
                     <Box>
@@ -476,39 +577,47 @@ const MyProfile = () => {
                         
                         {userProfile.selectedCareerTrack.levels && (
                           <Box>
-                            <Typography variant="subtitle2" gutterBottom>
-                              Текущий уровень: {userProfile.currentLevel}
-                            </Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                              <Typography variant="subtitle2" gutterBottom>
+                                Текущий уровень: {userProfile?.currentLevel || 1}
+                              </Typography>
+                              <Chip 
+                                label={`${userProfile?.currentLevel || 1}/5`} 
+                                color="primary" 
+                                variant="filled"
+                                size="small"
+                              />
+                            </Box>
                             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                               {[1, 2, 3, 4, 5].map((level) => (
                                 <Button
                                   key={level}
-                                  variant={userProfile.currentLevel === level ? "contained" : "outlined"}
+                                  variant={(userProfile?.currentLevel || 1) === level ? "contained" : "outlined"}
                                   size="small"
                                   onClick={() => handleSetCurrentLevel(level)}
-                                  color={userProfile.currentLevel === level ? "primary" : "default"}
+                                  color={(userProfile?.currentLevel || 1) === level ? "primary" : undefined}
                                 >
                                   Уровень {level}
                                 </Button>
                               ))}
                             </Box>
                             
-                            {userProfile.selectedCareerTrack.levels[userProfile.currentLevel] && (
+                            {userProfile?.selectedCareerTrack?.levels?.[userProfile?.currentLevel] && (
                               <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                                 <Typography variant="subtitle2" gutterBottom>
-                                  {userProfile.selectedCareerTrack.levels[userProfile.currentLevel].name}
+                                  {userProfile?.selectedCareerTrack?.levels?.[userProfile?.currentLevel]?.name}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary" paragraph>
-                                  {userProfile.selectedCareerTrack.levels[userProfile.currentLevel].description}
+                                  {userProfile?.selectedCareerTrack?.levels?.[userProfile?.currentLevel]?.description}
                                 </Typography>
                                 
-                                {userProfile.selectedCareerTrack.levels[userProfile.currentLevel].skills && (
+                                {userProfile?.selectedCareerTrack?.levels?.[userProfile?.currentLevel]?.skills && (
                                   <Box>
                                     <Typography variant="caption" color="text.secondary" gutterBottom>
                                       Требуемые навыки:
                                     </Typography>
                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                                      {Object.entries(userProfile.selectedCareerTrack.levels[userProfile.currentLevel].skills).map(([skill, level]) => (
+                                      {Object.entries(userProfile?.selectedCareerTrack?.levels?.[userProfile?.currentLevel]?.skills || {}).map(([skill, level]) => (
                                         <Chip
                                           key={skill}
                                           label={`${skill}: ${level}`}
@@ -525,13 +634,22 @@ const MyProfile = () => {
                         )}
                       </Paper>
                       
-                      <Button
-                        variant="outlined"
-                        onClick={() => setCareerTrackDialogOpen(true)}
-                        startIcon={<TimelineIcon />}
-                      >
-                        Изменить карьерный трек
-                      </Button>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Button
+                          variant="outlined"
+                          onClick={() => setCareerTrackDialogOpen(true)}
+                          startIcon={<TimelineIcon />}
+                        >
+                          Изменить карьерный трек
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          onClick={handleResetCareerTrack}
+                        >
+                          Сбросить
+                        </Button>
+                      </Box>
                     </Box>
                   ) : (
                     <Box>
@@ -585,17 +703,53 @@ const MyProfile = () => {
           {getAvailableCareerTracks().length > 0 ? (
             <List>
               {getAvailableCareerTracks().map((track) => (
-                <ListItem key={track.id} sx={{ border: '1px solid', borderColor: 'grey.200', borderRadius: 1, mb: 1 }}>
-                  <ListItemText
-                    primary={track.name}
-                    secondary={track.description}
-                  />
-                  <Button
-                    variant="contained"
-                    onClick={() => handleSelectCareerTrack(track)}
-                  >
-                    Выбрать
-                  </Button>
+                <ListItem key={track.id} sx={{ 
+                  border: '1px solid', 
+                  borderColor: 'grey.200', 
+                  borderRadius: 1, 
+                  mb: 1,
+                  flexDirection: 'column',
+                  alignItems: 'stretch',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: 'primary.50'
+                  }
+                }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h6" color="primary" gutterBottom>
+                        {track.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" paragraph>
+                        {track.description}
+                      </Typography>
+                      {track.requirements && track.requirements.length > 0 && (
+                        <Box sx={{ mb: 1 }}>
+                          <Typography variant="caption" color="text.secondary" gutterBottom>
+                            Требования:
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                            {track.requirements.map((req, index) => (
+                              <Chip 
+                                key={index}
+                                label={req} 
+                                size="small" 
+                                variant="outlined"
+                                color="secondary"
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
+                    </Box>
+                    <Button
+                      variant="contained"
+                      onClick={() => handleSelectCareerTrack(track)}
+                      sx={{ ml: 2, minWidth: 100 }}
+                    >
+                      Выбрать
+                    </Button>
+                  </Box>
                 </ListItem>
               ))}
             </List>

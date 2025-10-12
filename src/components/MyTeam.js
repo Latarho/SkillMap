@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -57,34 +57,34 @@ const MyTeam = () => {
 
     // Загружаем данные команды
     loadTeamData();
-  }, []);
+  }, [loadTeamData]);
 
-  const loadTeamData = () => {
+  const loadTeamData = useCallback(() => {
     // В реальном приложении здесь был бы API запрос
     // Пока используем моковые данные
     setTeamMembers(mockTeamMembers);
-  };
+  }, []);
 
-  const handleOpenEvaluation = (member) => {
+  const handleOpenEvaluation = useCallback((member) => {
     setSelectedMember(member);
     setEvaluations(member.skills || {});
     setEvaluationDialogOpen(true);
-  };
+  }, []);
 
-  const handleCloseEvaluation = () => {
+  const handleCloseEvaluation = useCallback(() => {
     setEvaluationDialogOpen(false);
     setSelectedMember(null);
     setEvaluations({});
-  };
+  }, []);
 
-  const handleSkillEvaluation = (skillId, value) => {
+  const handleSkillEvaluation = useCallback((skillId, value) => {
     setEvaluations(prev => ({
       ...prev,
       [skillId]: value
     }));
-  };
+  }, []);
 
-  const handleSaveEvaluation = () => {
+  const handleSaveEvaluation = useCallback(() => {
     if (selectedMember) {
       const updatedMembers = teamMembers.map(member => {
         if (member.id === selectedMember.id) {
@@ -99,7 +99,7 @@ const MyTeam = () => {
       showSnackbar('Оценки успешно сохранены!');
       handleCloseEvaluation();
     }
-  };
+  }, [selectedMember, teamMembers, evaluations, showSnackbar, handleCloseEvaluation]);
 
   const handleCloseSnackbar = () => {
     hideSnackbar();

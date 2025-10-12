@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -65,9 +65,9 @@ const Directories = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     // Загружаем компетенции
     const savedCompetencies = loadFromStorage(STORAGE_KEYS.COMPETENCIES);
     if (savedCompetencies) {
@@ -103,13 +103,13 @@ const Directories = () => {
       setCareerTracks(defaultCareerTracks);
       saveToStorage(STORAGE_KEYS.CAREER_TRACKS, defaultCareerTracks);
     }
-  };
+  }, []);
 
-  const handleTabChange = (event, newValue) => {
+  const handleTabChange = useCallback((event, newValue) => {
     setCurrentTab(newValue);
-  };
+  }, []);
 
-  const handleOpenDialog = (item = null) => {
+  const handleOpenDialog = useCallback((item = null) => {
     setEditingItem(item);
     if (item) {
       // Обрабатываем уровни профиля, чтобы skills были массивами
@@ -147,7 +147,7 @@ const Directories = () => {
       });
     }
     setDialogOpen(true);
-  };
+  }, []);
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
@@ -317,30 +317,41 @@ const Directories = () => {
             component={Paper} 
             sx={{ 
               maxHeight: { xs: 600, lg: 700, xl: 800 },
-              overflowX: 'auto',
+              overflowX: 'hidden',
+              width: '100%',
               '& .MuiTable-root': {
-                minWidth: { xs: 800, lg: 1000, xl: 1200 }
+                width: '100%',
+                tableLayout: 'fixed'
               }
             }}
           >
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ minWidth: { xs: 120, lg: 150, xl: 180 } }}>Название</TableCell>
-                  <TableCell sx={{ minWidth: { xs: 200, lg: 250, xl: 300 } }}>Описание</TableCell>
-                  <TableCell sx={{ minWidth: { xs: 120, lg: 150, xl: 180 } }}>Категория</TableCell>
-                  {currentTab === 0 && <TableCell sx={{ minWidth: { xs: 120, lg: 150, xl: 180 } }}>Тип</TableCell>}
-                  {currentTab === 0 && <TableCell sx={{ minWidth: { xs: 400, lg: 500, xl: 600 } }}>Уровни владения (1-5)</TableCell>}
-                  {currentTab === 1 && <TableCell sx={{ minWidth: { xs: 500, lg: 600, xl: 700 } }}>Уровни развития (1-5)</TableCell>}
-                  {currentTab === 2 && <TableCell sx={{ minWidth: { xs: 400, lg: 500, xl: 600 } }}>Карьерный трек</TableCell>}
-                  <TableCell sx={{ minWidth: { xs: 100, lg: 120, xl: 140 } }}>Действия</TableCell>
+                  <TableCell sx={{ width: '15%' }}>Название</TableCell>
+                  <TableCell sx={{ width: '25%' }}>Описание</TableCell>
+                  <TableCell sx={{ width: '15%' }}>Категория</TableCell>
+                  {currentTab === 0 && <TableCell sx={{ width: '10%' }}>Тип</TableCell>}
+                  {currentTab === 0 && <TableCell sx={{ width: '25%' }}>Уровни владения (1-5)</TableCell>}
+                  {currentTab === 1 && <TableCell sx={{ width: '30%' }}>Уровни развития (1-5)</TableCell>}
+                  {currentTab === 2 && <TableCell sx={{ width: '30%' }}>Карьерный трек</TableCell>}
+                  <TableCell sx={{ width: '10%' }}>Действия</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {getCurrentData().map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell>{item.name}</TableCell>
-                    <TableCell>{item.description}</TableCell>
+                    <TableCell sx={{ 
+                      width: '15%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>{item.name}</TableCell>
+                    <TableCell sx={{ 
+                      width: '25%',
+                      wordWrap: 'break-word',
+                      whiteSpace: 'normal'
+                    }}>{item.description}</TableCell>
                     <TableCell>
                       <Chip label={item.category} size="small" color="primary" variant="outlined" />
                     </TableCell>
@@ -355,7 +366,12 @@ const Directories = () => {
                       </TableCell>
                     )}
                     {currentTab === 0 && (
-                      <TableCell sx={{ maxWidth: 500, minWidth: 400 }}>
+                      <TableCell sx={{ 
+                        width: '25%',
+                        overflow: 'hidden',
+                        maxHeight: '200px',
+                        overflowY: 'auto'
+                      }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           {item.levels && Object.keys(item.levels).length > 0 ? (
                             Object.entries(item.levels).map(([level, indicator]) => (
@@ -407,7 +423,12 @@ const Directories = () => {
                       </TableCell>
                     )}
                     {currentTab === 1 && (
-                      <TableCell sx={{ maxWidth: 600, minWidth: 500 }}>
+                      <TableCell sx={{ 
+                        width: '30%',
+                        overflow: 'hidden',
+                        maxHeight: '200px',
+                        overflowY: 'auto'
+                      }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                           {item.levels && Object.keys(item.levels).length > 0 ? (
                             Object.entries(item.levels).map(([level, levelData]) => (
@@ -486,8 +507,13 @@ const Directories = () => {
                       </TableCell>
                     )}
                     {currentTab === 2 && (
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 400 }}>
+                      <TableCell sx={{ 
+                        width: '30%',
+                        overflow: 'hidden',
+                        maxHeight: '200px',
+                        overflowY: 'auto'
+                      }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                           <Typography variant="subtitle2" color="primary" gutterBottom>
                             {item.name}
                           </Typography>
