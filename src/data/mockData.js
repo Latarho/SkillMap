@@ -1,3 +1,5 @@
+import { defaultCareerTracks } from './careerTracks';
+
 // Моковые данные для компетенций
 export const defaultCompetencies = [
   { 
@@ -699,7 +701,34 @@ export const mockTeamMembers = [
       'SQL': 4,
       'Docker': 3,
       'Git': 5,
-    }
+    },
+    // Самооценка сотрудника
+    selfAssessment: {
+      1: 4, // JavaScript
+      3: 5, // Node.js
+      4: 4, // SQL
+      5: 3, // Docker
+      6: 5  // Git
+    },
+    selfAssessmentLevel: {
+      level: 4,
+      label: 'Высокий',
+      description: 'Сотрудник демонстрирует высокий уровень владения навыками'
+    },
+    selfAssessmentDate: '2024-01-15T10:00:00Z',
+    selfAssessmentComment: 'Уверенно работаю с JavaScript и Node.js, но хотелось бы улучшить навыки работы с Docker',
+    // Оценка руководителя
+    managerAssessment: {
+      1: 4, // JavaScript
+      3: 4, // Node.js
+      4: 4, // SQL
+      5: 2, // Docker
+      6: 5  // Git
+    },
+    managerComment: 'Отличный разработчик, хорошо знает основные технологии. Рекомендую пройти курс по Docker для повышения уровня.',
+    // Карьерный трек
+    selectedCareerTrack: defaultCareerTracks[0], // Backend разработчик
+    currentLevel: 2
   },
   {
     id: 2,
@@ -711,7 +740,32 @@ export const mockTeamMembers = [
       'React': 5,
       'Git': 4,
       'Agile': 3,
-    }
+    },
+    // Самооценка сотрудника
+    selfAssessment: {
+      1: 5, // JavaScript
+      2: 5, // React
+      6: 4, // Git
+      7: 3  // Agile
+    },
+    selfAssessmentLevel: {
+      level: 4,
+      label: 'Высокий',
+      description: 'Сотрудник демонстрирует высокий уровень владения навыками'
+    },
+    selfAssessmentDate: '2024-01-20T14:30:00Z',
+    selfAssessmentComment: 'Люблю работать с React и создавать красивые интерфейсы. Планирую изучить новые возможности React 18',
+    // Оценка руководителя
+    managerAssessment: {
+      1: 5, // JavaScript
+      2: 5, // React
+      6: 4, // Git
+      7: 4  // Agile
+    },
+    managerComment: 'Превосходный frontend разработчик! Очень креативная и ответственная. Отлично работает в команде.',
+    // Карьерный трек
+    selectedCareerTrack: defaultCareerTracks[1], // Frontend разработчик
+    currentLevel: 3
   },
   {
     id: 3,
@@ -722,6 +776,29 @@ export const mockTeamMembers = [
       'Docker': 5,
       'Git': 5,
       'Agile': 4,
-    }
+    },
+    // Самооценка сотрудника
+    selfAssessment: {
+      5: 5, // Docker
+      6: 5, // Git
+      7: 4  // Agile
+    },
+    selfAssessmentLevel: {
+      level: 5,
+      label: 'Экспертный',
+      description: 'Сотрудник демонстрирует экспертный уровень владения навыками'
+    },
+    selfAssessmentDate: '2024-01-18T09:15:00Z',
+    selfAssessmentComment: 'Специализируюсь на DevOps практиках. Помогаю команде с настройкой CI/CD и инфраструктуры',
+    // Оценка руководителя
+    managerAssessment: {
+      5: 5, // Docker
+      6: 5, // Git
+      7: 4  // Agile
+    },
+    managerComment: 'Эксперт в области DevOps. Незаменимый член команды, всегда готов помочь с инфраструктурными вопросами.',
+    // Карьерный трек
+    selectedCareerTrack: defaultCareerTracks[2], // DevOps инженер
+    currentLevel: 4
   }
 ];

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card,
   CardContent,
@@ -41,6 +42,7 @@ import { defaultCareerTracks } from '../data/careerTracks';
 import NotificationSnackbar from './common/NotificationSnackbar';
 
 const Directories = () => {
+  const navigate = useNavigate();
   const [currentTab, setCurrentTab] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -50,14 +52,17 @@ const Directories = () => {
   const [competencies, setCompetencies] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [careerTracks, setCareerTracks] = useState([]);
+  
+  // Фильтр для карьерных треков
+  const [profileFilter, setProfileFilter] = useState('');
 
   // Форма для редактирования
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    category: '',
     level: '',
     type: '',
+    profileId: '', // Добавляем поле для выбора профиля
     levels: {},
     requirements: [],
     horizontalGrowth: {},
@@ -127,9 +132,9 @@ const Directories = () => {
       setFormData({
         name: item.name || '',
         description: item.description || '',
-        category: item.category || '',
         level: item.level || '',
         type: item.type || '',
+        profileId: item.profileId || '', // Добавляем profileId
         levels: processedLevels,
         requirements: item.requirements || [],
         horizontalGrowth: item.horizontalGrowth || {},
@@ -138,9 +143,9 @@ const Directories = () => {
       setFormData({
         name: '',
         description: '',
-        category: '',
         level: '',
         type: '',
+        profileId: '', // Добавляем profileId
         levels: {},
         requirements: [],
         horizontalGrowth: {},
@@ -174,9 +179,9 @@ const Directories = () => {
       id: editingItem ? editingItem.id : Date.now(),
       name: formData.name,
       description: formData.description,
-      category: formData.category,
       level: formData.level,
       type: formData.type,
+      profileId: formData.profileId,
       levels: formData.levels,
       requirements: formData.requirements,
       horizontalGrowth: formData.horizontalGrowth,
@@ -230,7 +235,11 @@ const Directories = () => {
     switch (currentTab) {
       case 0: return competencies;
       case 1: return profiles;
-      case 2: return careerTracks;
+      case 2: 
+        if (profileFilter) {
+          return careerTracks.filter(track => track.profileId === parseInt(profileFilter));
+        }
+        return careerTracks;
       default: return [];
     }
   };
@@ -248,16 +257,17 @@ const Directories = () => {
     if (window.confirm('Вы уверены, что хотите сбросить все данные? Это действие нельзя отменить.')) {
       forceUpdateData();
       loadData();
-      showSnackbar('Данные обновлены! Страница будет перезагружена.');
+      showSnackbar('Данные обновлены!');
+      // Вместо перезагрузки страницы просто обновляем данные
       setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+        navigate('/directories', { replace: true });
+      }, 500);
     }
   };
 
 
   return (
-    <Box>
+    <Box sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
       <Typography variant="h4" gutterBottom>
         Справочники
       </Typography>
@@ -294,7 +304,26 @@ const Directories = () => {
                 </Typography>
               )}
             </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              {currentTab === 2 && (
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel>Фильтр по профилю</InputLabel>
+                  <Select
+                    value={profileFilter}
+                    onChange={(e) => setProfileFilter(e.target.value)}
+                    label="Фильтр по профилю"
+                  >
+                    <MenuItem value="">
+                      <em>Все профили</em>
+                    </MenuItem>
+                    {profiles.map((profile) => (
+                      <MenuItem key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
               <Button
                 variant="outlined"
                 color="warning"
@@ -329,13 +358,13 @@ const Directories = () => {
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ width: '15%' }}>Название</TableCell>
-                  <TableCell sx={{ width: '25%' }}>Описание</TableCell>
-                  <TableCell sx={{ width: '15%' }}>Категория</TableCell>
+                  <TableCell sx={{ width: '10%' }}>Описание</TableCell>
                   {currentTab === 0 && <TableCell sx={{ width: '10%' }}>Тип</TableCell>}
-                  {currentTab === 0 && <TableCell sx={{ width: '25%' }}>Уровни владения (1-5)</TableCell>}
+                  {currentTab === 0 && <TableCell sx={{ width: '40%' }}>Уровни владения (1-5)</TableCell>}
                   {currentTab === 1 && <TableCell sx={{ width: '30%' }}>Уровни развития (1-5)</TableCell>}
+                  {currentTab === 2 && <TableCell sx={{ width: '15%' }}>Профиль</TableCell>}
                   {currentTab === 2 && <TableCell sx={{ width: '30%' }}>Карьерный трек</TableCell>}
-                  <TableCell sx={{ width: '10%' }}>Действия</TableCell>
+                  <TableCell sx={{ width: '5%' }}>Действия</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -348,13 +377,10 @@ const Directories = () => {
                       whiteSpace: 'nowrap'
                     }}>{item.name}</TableCell>
                     <TableCell sx={{ 
-                      width: '25%',
+                      width: '10%',
                       wordWrap: 'break-word',
                       whiteSpace: 'normal'
                     }}>{item.description}</TableCell>
-                    <TableCell>
-                      <Chip label={item.category} size="small" color="primary" variant="outlined" />
-                    </TableCell>
                     {currentTab === 0 && (
                       <TableCell>
                         <Chip 
@@ -367,7 +393,7 @@ const Directories = () => {
                     )}
                     {currentTab === 0 && (
                       <TableCell sx={{ 
-                        width: '25%',
+                        width: '40%',
                         overflow: 'hidden',
                         maxHeight: '200px',
                         overflowY: 'auto'
@@ -454,13 +480,6 @@ const Directories = () => {
                                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
                                     {levelData.title}
                                   </Typography>
-                                  <Chip 
-                                    label={levelData.salary} 
-                                    size="small" 
-                                    color="success" 
-                                    variant="outlined"
-                                    sx={{ fontSize: '0.65rem', height: 20 }}
-                                  />
                                 </Box>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: '0.8rem' }}>
                                   {levelData.description}
@@ -504,6 +523,25 @@ const Directories = () => {
                             </Typography>
                           )}
                         </Box>
+                      </TableCell>
+                    )}
+                    {currentTab === 2 && (
+                      <TableCell sx={{ width: '15%' }}>
+                        {(() => {
+                          const profile = profiles.find(p => p.id === item.profileId);
+                          return profile ? (
+                            <Chip 
+                              label={profile.name} 
+                              size="small" 
+                              color="secondary" 
+                              variant="outlined" 
+                            />
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">
+                              Не выбран
+                            </Typography>
+                          );
+                        })()}
                       </TableCell>
                     )}
                     {currentTab === 2 && (
@@ -596,7 +634,7 @@ const Directories = () => {
                         </Box>
                       </TableCell>
                     )}
-                    <TableCell>
+                    <TableCell sx={{ width: '5%' }}>
                       <IconButton
                         size="small"
                         onClick={() => handleOpenDialog(item)}
@@ -638,7 +676,7 @@ const Directories = () => {
           {editingItem ? 'Редактировать' : 'Добавить'} элемент
           </Typography>
         </DialogTitle>
-        <DialogContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+        <DialogContent sx={{ p: { xs: 1, sm: 1.5, md: 2 } }}>
           <TextField
             autoFocus
             margin="dense"
@@ -658,15 +696,6 @@ const Directories = () => {
             variant="outlined"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            margin="dense"
-            label="Категория"
-            fullWidth
-            variant="outlined"
-            value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
             sx={{ mb: 2 }}
           />
           {currentTab === 0 && (
@@ -819,27 +848,6 @@ const Directories = () => {
                         sx={{ mb: 1 }}
                       />
                     </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        margin="dense"
-                        label={`Зарплата (уровень ${level})`}
-                        fullWidth
-                        variant="outlined"
-                        value={formData.levels?.[level]?.salary || ''}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          levels: {
-                            ...formData.levels,
-                            [level]: {
-                              ...formData.levels?.[level],
-                              salary: e.target.value
-                            }
-                          }
-                        })}
-                        placeholder="Например: 80,000 - 120,000 руб/мес"
-                        sx={{ mb: 1 }}
-                      />
-                    </Grid>
                     <Grid item xs={12}>
                       <TextField
                         margin="dense"
@@ -974,6 +982,21 @@ const Directories = () => {
                 placeholder="Краткое описание карьерного трека"
               />
               
+              <FormControl fullWidth margin="dense" sx={{ mb: 2 }}>
+                <InputLabel>Связанный профиль</InputLabel>
+                <Select
+                  value={formData.profileId}
+                  onChange={(e) => setFormData({ ...formData, profileId: e.target.value })}
+                  label="Связанный профиль"
+                >
+                  {profiles.map((profile) => (
+                    <MenuItem key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              
               <TextField
                 margin="dense"
                 label="Базовые требования (через запятую)"
@@ -1081,6 +1104,27 @@ const Directories = () => {
                     }}
                     placeholder="JavaScript:3, Node.js:3, SQL:2, Git:3"
                   />
+                  
+                  {/* Отображение минимального уровня владения компетенцией */}
+                  {formData.levels?.[level]?.skills && Object.keys(formData.levels[level].skills).length > 0 && (
+                    <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.50', borderRadius: 1, border: '1px solid', borderColor: 'primary.200' }}>
+                      <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 'bold' }}>
+                        Минимальный уровень владения компетенцией:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {Object.entries(formData.levels[level].skills).map(([skill, skillLevel]) => (
+                          <Chip
+                            key={skill}
+                            label={`${skill}: ${skillLevel}`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontSize: '0.75rem', fontWeight: 'bold' }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
                 </Box>
               ))}
             </Box>

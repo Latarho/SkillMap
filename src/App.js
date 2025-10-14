@@ -124,7 +124,7 @@ const App = () => {
         sx={{ 
           mt: 3, 
           mb: 3,
-          px: { xs: 2, sm: 3, md: 4, lg: 6, xl: 8 },
+          px: 0,
           maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
         }}
       >
