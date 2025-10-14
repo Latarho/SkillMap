@@ -2,11 +2,18 @@ import React from 'react';
 import { Snackbar, Alert } from '@mui/material';
 import { SNACKBAR_CONFIG } from '../../constants';
 
+/**
+ * Универсальный компонент для отображения уведомлений
+ * @param {boolean} open - состояние открытия
+ * @param {string} message - сообщение
+ * @param {string} severity - тип уведомления (success, error, warning, info)
+ * @param {function} onClose - функция закрытия
+ */
 const NotificationSnackbar = ({ 
   open, 
   message, 
-  onClose, 
-  severity = 'success' 
+  severity = 'info', 
+  onClose 
 }) => {
   return (
     <Snackbar
@@ -15,7 +22,12 @@ const NotificationSnackbar = ({
       onClose={onClose}
       anchorOrigin={SNACKBAR_CONFIG.anchorOrigin}
     >
-      <Alert onClose={onClose} severity={severity}>
+      <Alert 
+        onClose={onClose} 
+        severity={severity} 
+        variant="filled"
+        sx={{ width: '100%' }}
+      >
         {message}
       </Alert>
     </Snackbar>

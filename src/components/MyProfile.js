@@ -21,6 +21,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { 
   Save as SaveIcon, 
@@ -31,11 +33,13 @@ import {
   Person as PersonIcon
 } from '@mui/icons-material';
 import { useSnackbar } from '../hooks/useSnackbar';
-import { loadFromStorage, saveToStorage } from '../utils';
-import { STORAGE_KEYS, MAX_ADDITIONAL_PROFILES } from '../constants';
-import { defaultProfiles } from '../data/mockData';
+import { loadFromStorage, saveToStorage, calculateOverallLevel, analyzeSelfAssessment } from '../utils';
+import { STORAGE_KEYS, MAX_ADDITIONAL_PROFILES, COMPETENCY_TYPES } from '../constants';
+import { defaultProfiles, defaultCompetencies } from '../data/mockData';
 import { defaultCareerTracks } from '../data/careerTracks';
 import NotificationSnackbar from './common/NotificationSnackbar';
+import SelfAssessmentDialog from './common/SelfAssessmentDialog';
+import CareerTrackTree from './common/CareerTrackTree';
 
 const MyProfile = () => {
   console.log('MyProfile: Компонент инициализируется');
@@ -47,9 +51,15 @@ const MyProfile = () => {
     mainProfile: null,
     additionalProfiles: [],
     selectedCareerTrack: null,
-    currentLevel: 1
+    currentLevel: 1,
+    selfAssessment: null,
+    calculatedLevel: null,
+    considersHorizontalTransition: false
   });
   const [careerTrackDialogOpen, setCareerTrackDialogOpen] = useState(false);
+  const [selfAssessmentDialogOpen, setSelfAssessmentDialogOpen] = useState(false);
+  const [allCompetencies, setAllCompetencies] = useState([]);
+  const [competencies, setCompetencies] = useState([]);
   const { snackbarOpen, snackbarMessage, showSnackbar, hideSnackbar } = useSnackbar();
 
   console.log('MyProfile: Состояния инициализированы', {
@@ -68,6 +78,46 @@ const MyProfile = () => {
       showSnackbar('Ошибка при инициализации компонента');
     }
   }, [loadData, showSnackbar]);
+
+  // Обновляем компетенции при изменении основного профиля
+  useEffect(() => {
+    if (userProfile?.mainProfile && allCompetencies.length > 0) {
+      const filteredCompetencies = filterCompetenciesByProfile(userProfile.mainProfile, allCompetencies);
+      setCompetencies(filteredCompetencies);
+    } else {
+      setCompetencies([]);
+    }
+  }, [userProfile?.mainProfile, allCompetencies, filterCompetenciesByProfile]);
+
+  // Функция для фильтрации компетенций по основному профилю
+  const filterCompetenciesByProfile = useCallback((profile, allCompetencies) => {
+    if (!profile || !allCompetencies || allCompetencies.length === 0) {
+      return [];
+    }
+
+    // Собираем все навыки из всех уровней профиля
+    const profileSkills = new Set();
+    Object.values(profile.levels || {}).forEach(level => {
+      if (level.skills && Array.isArray(level.skills)) {
+        level.skills.forEach(skill => profileSkills.add(skill));
+      }
+    });
+
+    // Фильтруем компетенции по навыкам профиля
+    const filteredCompetencies = allCompetencies.filter(competency => 
+      profileSkills.has(competency.name)
+    );
+
+    console.log('Фильтрация компетенций:', {
+      profile: profile.name,
+      profileSkills: Array.from(profileSkills),
+      allCompetencies: allCompetencies.length,
+      filteredCompetencies: filteredCompetencies.length,
+      filteredNames: filteredCompetencies.map(c => c.name)
+    });
+
+    return filteredCompetencies;
+  }, []);
 
   const loadData = useCallback(() => {
     try {
@@ -110,6 +160,17 @@ const MyProfile = () => {
         console.log('Карьерные треки инициализированы:', defaultCareerTracks);
       }
 
+      // Загружаем компетенции
+      const savedCompetencies = loadFromStorage(STORAGE_KEYS.COMPETENCIES);
+      if (savedCompetencies) {
+        setAllCompetencies(savedCompetencies);
+        console.log('Компетенции загружены:', savedCompetencies);
+      } else {
+        setAllCompetencies(defaultCompetencies);
+        saveToStorage(STORAGE_KEYS.COMPETENCIES, defaultCompetencies);
+        console.log('Компетенции инициализированы:', defaultCompetencies);
+      }
+
       // Загружаем профиль пользователя
       const userProfileData = loadFromStorage(STORAGE_KEYS.USER_PROFILE);
       if (userProfileData) {
@@ -143,11 +204,47 @@ const MyProfile = () => {
         ...userProfile,
         mainProfile: profile
       };
+      
+      // Автоматически выбираем первый подходящий карьерный трек
+      const availableTracks = careerTracks.filter(track => {
+        const profileName = profile.name.toLowerCase();
+        const trackName = track.name.toLowerCase();
+        
+        // Проверяем совпадение по названию профиля и трека
+        const nameMatch = trackName.includes(profileName) || profileName.includes(trackName);
+        
+        // Проверяем требования трека
+        const requirementsMatch = track.requirements?.some(req => {
+          const reqLower = req.toLowerCase();
+          return profileName.includes(reqLower) || reqLower.includes(profileName);
+        });
+        
+        // Проверяем общие ключевые слова
+        const commonKeywords = ['разработчик', 'developer', 'backend', 'frontend', 'fullstack'];
+        const keywordMatch = commonKeywords.some(keyword => 
+          profileName.includes(keyword) && trackName.includes(keyword)
+        );
+        
+        return nameMatch || requirementsMatch || keywordMatch;
+      });
+      
+      // Если есть подходящие треки, выбираем первый
+      if (availableTracks.length > 0) {
+        updatedProfile.selectedCareerTrack = availableTracks[0];
+        updatedProfile.currentLevel = 1;
+        console.log('Автоматически выбран карьерный трек:', availableTracks[0].name);
+      }
+      
       setUserProfile(updatedProfile);
       saveToStorage(STORAGE_KEYS.USER_PROFILE, updatedProfile);
-      showSnackbar('Основной профиль установлен!');
+      
+      if (availableTracks.length > 0) {
+        showSnackbar(`Основной профиль установлен! Автоматически выбран карьерный трек: "${availableTracks[0].name}"`);
+      } else {
+        showSnackbar('Основной профиль установлен!');
+      }
     }
-  }, [availableProfiles, userProfile, showSnackbar]);
+  }, [availableProfiles, userProfile, careerTracks, showSnackbar]);
 
   const handleAddAdditionalProfile = useCallback(() => {
     if (!selectedProfile) {
@@ -202,6 +299,22 @@ const MyProfile = () => {
     setUserProfile(updatedProfile);
     saveToStorage(STORAGE_KEYS.USER_PROFILE, updatedProfile);
     showSnackbar('Дополнительный профиль удален');
+  }, [userProfile, showSnackbar]);
+
+  const handleHorizontalTransitionChange = useCallback((event) => {
+    const checked = event.target.checked;
+    const updatedProfile = {
+      ...userProfile,
+      considersHorizontalTransition: checked
+    };
+    setUserProfile(updatedProfile);
+    saveToStorage(STORAGE_KEYS.USER_PROFILE, updatedProfile);
+    
+    if (checked) {
+      showSnackbar('Включен режим горизонтального развития');
+    } else {
+      showSnackbar('Отключен режим горизонтального развития');
+    }
   }, [userProfile, showSnackbar]);
 
   const handleSelectCareerTrack = (careerTrack) => {
@@ -307,7 +420,9 @@ const MyProfile = () => {
         mainProfile: null,
         additionalProfiles: [],
         selectedCareerTrack: null,
-        currentLevel: 1
+        currentLevel: 1,
+        selfAssessment: null,
+        calculatedLevel: null
       });
       setSelectedProfile('');
       
@@ -326,6 +441,40 @@ const MyProfile = () => {
     }
   };
 
+  const handleSaveSelfAssessment = useCallback((assessmentData) => {
+    try {
+      const updatedProfile = {
+        ...userProfile,
+        selfAssessment: assessmentData.assessments,
+        calculatedLevel: assessmentData.overallLevel,
+        assessmentDate: assessmentData.calculatedAt,
+        assessmentComment: assessmentData.comment || ''
+      };
+      
+      setUserProfile(updatedProfile);
+      saveToStorage(STORAGE_KEYS.USER_PROFILE, updatedProfile);
+      showSnackbar('Самооценка сохранена!');
+      
+      // Обновляем текущий уровень в карьерном треке если он есть
+      if (userProfile.selectedCareerTrack && assessmentData.overallLevel.level !== userProfile.currentLevel) {
+        const updatedProfileWithLevel = {
+          ...updatedProfile,
+          currentLevel: assessmentData.overallLevel.level
+        };
+        setUserProfile(updatedProfileWithLevel);
+        saveToStorage(STORAGE_KEYS.USER_PROFILE, updatedProfileWithLevel);
+        showSnackbar(`Уровень в карьерном треке обновлен до ${assessmentData.overallLevel.level}`);
+      }
+    } catch (error) {
+      console.error('Error saving self assessment:', error);
+      showSnackbar('Ошибка при сохранении самооценки');
+    }
+  }, [userProfile, showSnackbar]);
+
+  const handleOpenSelfAssessment = () => {
+    setSelfAssessmentDialogOpen(true);
+  };
+
   const getAvailableCareerTracks = () => {
     if (!userProfile || !userProfile?.mainProfile) return [];
     
@@ -333,7 +482,7 @@ const MyProfile = () => {
       console.log('Filtering career tracks for profile:', userProfile.mainProfile.name);
       console.log('Available career tracks:', careerTracks);
       
-      // Более гибкая фильтрация карьерных треков
+      // Фильтрация карьерных треков по основному профилю
       const filteredTracks = careerTracks.filter(track => {
         const profileName = userProfile.mainProfile.name.toLowerCase();
         const trackName = track.name.toLowerCase();
@@ -374,7 +523,7 @@ const MyProfile = () => {
   }
 
   return (
-    <Box>
+    <Box sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h4" gutterBottom>
           Мой профиль
@@ -393,10 +542,10 @@ const MyProfile = () => {
       </Typography>
 
       <Grid container spacing={{ xs: 2, sm: 3, md: 4, lg: 3, xl: 4 }}>
-        {/* Основной профиль */}
-        <Grid item xs={12} lg={6} xl={4}>
+        {/* Первая строка: Основной профиль и Дополнительные профили */}
+        <Grid item xs={12} lg={6}>
           <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+            <CardContent sx={{ p: { xs: 1, sm: 1.5, md: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                 <StarIcon color="primary" sx={{ fontSize: { xs: '1.5rem', lg: '1.75rem', xl: '2rem' } }} />
                 <Typography variant="h5" sx={{ fontSize: { xs: '1.25rem', lg: '1.5rem', xl: '1.75rem' } }}>
@@ -471,10 +620,9 @@ const MyProfile = () => {
           </Card>
         </Grid>
 
-        {/* Дополнительные профили */}
-        <Grid item xs={12} lg={6} xl={4}>
+        <Grid item xs={12} lg={6}>
           <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+            <CardContent sx={{ p: { xs: 1, sm: 1.5, md: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                 <PersonIcon color="secondary" sx={{ fontSize: { xs: '1.5rem', lg: '1.75rem', xl: '2rem' } }} />
                 <Typography variant="h5" sx={{ fontSize: { xs: '1.25rem', lg: '1.5rem', xl: '1.75rem' } }}>
@@ -487,6 +635,23 @@ const MyProfile = () => {
                   variant="outlined"
                   sx={{ fontSize: { xs: '0.75rem', lg: '0.8rem', xl: '0.85rem' } }}
                 />
+              </Box>
+
+              {/* Чекбокс горизонтального перехода */}
+              <Box sx={{ mb: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={userProfile?.considersHorizontalTransition || false}
+                      onChange={handleHorizontalTransitionChange}
+                      color="secondary"
+                    />
+                  }
+                  label="Рассматривает горизонтальный переход"
+                />
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                  Если отмечено, доступен выбор профилей для горизонтального развития
+                </Typography>
               </Box>
 
               {userProfile?.additionalProfiles?.length > 0 && (
@@ -515,14 +680,14 @@ const MyProfile = () => {
                 </Box>
               )}
 
-              {userProfile?.additionalProfiles?.length < MAX_ADDITIONAL_PROFILES && (
+              {userProfile?.additionalProfiles?.length < MAX_ADDITIONAL_PROFILES && userProfile?.considersHorizontalTransition && (
                 <Box>
                   <FormControl fullWidth margin="normal">
-                    <InputLabel>Добавить дополнительный профиль</InputLabel>
+                    <InputLabel>Добавить профиль для горизонтального развития</InputLabel>
                     <Select
                       value={selectedProfile}
                       onChange={handleProfileChange}
-                      label="Добавить дополнительный профиль"
+                      label="Добавить профиль для горизонтального развития"
                     >
                       {availableProfiles
                         .filter(profile => 
@@ -548,14 +713,131 @@ const MyProfile = () => {
                   </Button>
                 </Box>
               )}
+
+              {!userProfile?.considersHorizontalTransition && (
+                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Отметьте чекбокс выше, чтобы добавить профили для горизонтального развития
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Карьерный трек */}
-        <Grid item xs={12} xl={4}>
+        {/* Вторая строка: Самооценка навыков */}
+        <Grid item xs={12}>
           <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+            <CardContent sx={{ p: { xs: 1, sm: 1.5, md: 2 } }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <StarIcon color="warning" sx={{ fontSize: { xs: '1.5rem', lg: '1.75rem', xl: '2rem' } }} />
+                <Typography variant="h5" sx={{ fontSize: { xs: '1.25rem', lg: '1.5rem', xl: '1.75rem' } }}>
+                  Самооценка навыков
+                </Typography>
+              </Box>
+
+              {userProfile?.calculatedLevel ? (
+                <Box>
+                  <Paper sx={{ p: 2, mb: 2, bgcolor: 'warning.50', border: '1px solid', borderColor: 'warning.200' }}>
+                    <Typography variant="h6" gutterBottom>
+                      Определенный уровень: {userProfile.calculatedLevel.level}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" paragraph>
+                      {userProfile.calculatedLevel.description}
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Средний уровень: {userProfile.calculatedLevel.average}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Оценено навыков: {userProfile.calculatedLevel.skillCount}
+                        </Typography>
+                      </Box>
+                      <Chip 
+                        label={userProfile.calculatedLevel.label} 
+                        color="warning" 
+                        variant="filled"
+                        size="small"
+                      />
+                    </Box>
+                  </Paper>
+
+                  {/* Комментарий к самооценке */}
+                  {userProfile?.assessmentComment && (
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'info.50', border: '1px solid', borderColor: 'info.200' }}>
+                      <Typography variant="subtitle2" gutterBottom color="info.main">
+                        Комментарий к самооценке:
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                        "{userProfile.assessmentComment}"
+                      </Typography>
+                    </Paper>
+                  )}
+                  
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Button
+                      variant="outlined"
+                      onClick={handleOpenSelfAssessment}
+                      startIcon={<StarIcon />}
+                    >
+                      Обновить оценку
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="info"
+                      onClick={() => {
+                        const analysis = analyzeSelfAssessment(userProfile.selfAssessment, competencies);
+                        console.log('Анализ самооценки:', analysis);
+                        showSnackbar('Анализ сохранен в консоли разработчика');
+                      }}
+                    >
+                      Показать анализ
+                    </Button>
+                  </Box>
+                </Box>
+              ) : (
+                <Box>
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    Проведите самооценку своих навыков для определения текущего уровня развития
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={handleOpenSelfAssessment}
+                    startIcon={<StarIcon />}
+                    color="warning"
+                  >
+                    Начать самооценку
+                  </Button>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Третья строка: Карьерный трек */}
+        <Grid item xs={12}>
+          <Card sx={{ height: '100%', maxHeight: '800px' }}>
+            <CardContent sx={{ 
+              p: { xs: 2, sm: 3, md: 4 },
+              height: 'calc(100% - 32px)',
+              overflowY: 'auto',
+              '&::-webkit-scrollbar': {
+                width: '8px',
+              },
+              '&::-webkit-scrollbar-track': {
+                background: '#f1f1f1',
+                borderRadius: '4px',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                background: '#c1c1c1',
+                borderRadius: '4px',
+                '&:hover': {
+                  background: '#a8a8a8',
+                },
+              },
+            }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                 <TimelineIcon color="success" sx={{ fontSize: { xs: '1.5rem', lg: '1.75rem', xl: '2rem' } }} />
                 <Typography variant="h5" sx={{ fontSize: { xs: '1.25rem', lg: '1.5rem', xl: '1.75rem' } }}>
@@ -566,91 +848,13 @@ const MyProfile = () => {
               {userProfile && userProfile?.mainProfile ? (
                 <Box>
                   {userProfile.selectedCareerTrack ? (
-                    <Box>
-                      <Paper sx={{ p: 2, mb: 2, bgcolor: 'success.50', border: '1px solid', borderColor: 'success.200' }}>
-                        <Typography variant="h6" gutterBottom>
-                          {userProfile.selectedCareerTrack.name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" paragraph>
-                          {userProfile.selectedCareerTrack.description}
-                        </Typography>
-                        
-                        {userProfile.selectedCareerTrack.levels && (
-                          <Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                              <Typography variant="subtitle2" gutterBottom>
-                                Текущий уровень: {userProfile?.currentLevel || 1}
-                              </Typography>
-                              <Chip 
-                                label={`${userProfile?.currentLevel || 1}/5`} 
-                                color="primary" 
-                                variant="filled"
-                                size="small"
-                              />
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                              {[1, 2, 3, 4, 5].map((level) => (
-                                <Button
-                                  key={level}
-                                  variant={(userProfile?.currentLevel || 1) === level ? "contained" : "outlined"}
-                                  size="small"
-                                  onClick={() => handleSetCurrentLevel(level)}
-                                  color={(userProfile?.currentLevel || 1) === level ? "primary" : undefined}
-                                >
-                                  Уровень {level}
-                                </Button>
-                              ))}
-                            </Box>
-                            
-                            {userProfile?.selectedCareerTrack?.levels?.[userProfile?.currentLevel] && (
-                              <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                <Typography variant="subtitle2" gutterBottom>
-                                  {userProfile?.selectedCareerTrack?.levels?.[userProfile?.currentLevel]?.name}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" paragraph>
-                                  {userProfile?.selectedCareerTrack?.levels?.[userProfile?.currentLevel]?.description}
-                                </Typography>
-                                
-                                {userProfile?.selectedCareerTrack?.levels?.[userProfile?.currentLevel]?.skills && (
-                                  <Box>
-                                    <Typography variant="caption" color="text.secondary" gutterBottom>
-                                      Требуемые навыки:
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                                      {Object.entries(userProfile?.selectedCareerTrack?.levels?.[userProfile?.currentLevel]?.skills || {}).map(([skill, level]) => (
-                                        <Chip
-                                          key={skill}
-                                          label={`${skill}: ${level}`}
-                                          size="small"
-                                          variant="outlined"
-                                        />
-                                      ))}
-                                    </Box>
-                                  </Box>
-                                )}
-                              </Box>
-                            )}
-                          </Box>
-                        )}
-                      </Paper>
-                      
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        <Button
-                          variant="outlined"
-                          onClick={() => setCareerTrackDialogOpen(true)}
-                          startIcon={<TimelineIcon />}
-                        >
-                          Изменить карьерный трек
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          color="error"
-                          onClick={handleResetCareerTrack}
-                        >
-                          Сбросить
-                        </Button>
-                      </Box>
-                    </Box>
+                    <CareerTrackTree 
+                      careerTrack={userProfile.selectedCareerTrack}
+                      currentLevel={userProfile?.currentLevel || 1}
+                      onLevelChange={handleSetCurrentLevel}
+                      userSkills={userProfile?.selfAssessment || {}}
+                      competencies={competencies}
+                    />
                   ) : (
                     <Box>
                       <Typography variant="body2" color="text.secondary" paragraph>
@@ -676,6 +880,15 @@ const MyProfile = () => {
         </Grid>
       </Grid>
 
+      {/* Диалог самооценки */}
+      <SelfAssessmentDialog
+        open={selfAssessmentDialogOpen}
+        onClose={() => setSelfAssessmentDialogOpen(false)}
+        userProfile={userProfile}
+        competencies={competencies}
+        onSaveAssessment={handleSaveSelfAssessment}
+      />
+
       {/* Диалог выбора карьерного трека */}
       <Dialog 
         open={careerTrackDialogOpen} 
@@ -695,7 +908,7 @@ const MyProfile = () => {
             Выбор карьерного трека
           </Typography>
         </DialogTitle>
-        <DialogContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+        <DialogContent sx={{ p: { xs: 1, sm: 1.5, md: 2 } }}>
           <Typography variant="body1" color="text.secondary" paragraph sx={{ mb: 3 }}>
             Выберите карьерный трек для развития в рамках профиля "{userProfile.mainProfile?.name}"
           </Typography>
