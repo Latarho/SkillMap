@@ -1,20 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Container,
-  Tabs,
-  Tab,
-  Box,
-  Button,
-} from '@mui/material';
+import React, { useState } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { Box, Typography, Container, useTheme, useMediaQuery } from '@mui/material';
+import AppLayout from './components/layout/AppLayout';
 import MyProfile from './components/MyProfile';
 import MyTeam from './components/MyTeam';
 import Directories from './components/Directories';
+import Analytics from './components/Analytics';
+import IndividualDevelopmentPlan from './components/IndividualDevelopmentPlan';
+import KnowledgeBase from './components/KnowledgeBase';
+import Achievements from './components/Achievements';
+import ExpertsCatalog from './components/ExpertsCatalog';
+import TeamBuilder from './components/TeamBuilder';
+import Feedback360 from './components/Feedback360';
+import DataManagement from './components/DataManagement';
+import Notifications from './components/Notifications';
+import useNavigation from './hooks/useNavigation';
+import { BREAKPOINTS } from './config/constants';
 
-// Компонент для обработки ошибок
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -48,84 +50,23 @@ class ErrorBoundary extends React.Component {
 }
 
 const App = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [currentTab, setCurrentTab] = useState(0);
-  const [error, setError] = useState(null);
-
-  // Обработка ошибок
-  useEffect(() => {
-    const handleError = (error) => {
-      console.error('App Error:', error);
-      setError(error.message);
-    };
-
-    window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
-  }, []);
-
-  const handleTabChange = (event, newValue) => {
-    setCurrentTab(newValue);
-    const routes = ['/profile', '/team', '/directories'];
-    navigate(routes[newValue] || '/profile');
-  };
-
-  // Определяем текущую вкладку на основе URL
-  useEffect(() => {
-    const path = location.pathname;
-    const tabMap = {
-      '/profile': 0,
-      '/team': 1,
-      '/directories': 2,
-    };
-    setCurrentTab(tabMap[path] || 0);
-  }, [location.pathname]);
-
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h4" color="error">
-          Ошибка приложения
-        </Typography>
-        <Typography variant="body1" sx={{ mt: 2 }}>
-          {error}
-        </Typography>
-        <Button 
-          variant="contained" 
-          onClick={() => window.location.reload()}
-          sx={{ mt: 2 }}
-        >
-          Перезагрузить страницу
-        </Button>
-      </Box>
-    );
-  }
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down(BREAKPOINTS.mobile));
+  
+  const { currentTab, mobileOpen, handleNavigation, handleDrawerToggle } = useNavigation(isMobile);
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            SkillMap - Управление навыками
-          </Typography>
-        </Toolbar>
-      </AppBar>
-      
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={currentTab} onChange={handleTabChange} centered>
-          <Tab label="Мой профиль" />
-          <Tab label="Моя команда" />
-          <Tab label="Справочники" />
-        </Tabs>
-      </Box>
-
+    <AppLayout
+      currentTab={currentTab}
+      mobileOpen={mobileOpen}
+      onNavigate={handleNavigation}
+      onDrawerToggle={handleDrawerToggle}
+    >
       <Container 
-        maxWidth={false} 
+        maxWidth="xl" 
         sx={{ 
-          mt: 3, 
-          mb: 3,
-          px: 0,
-          maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
+          py: { xs: 2, md: 4 },
+          px: { xs: 2, sm: 3, md: 4 },
         }}
       >
         <Routes>
@@ -133,9 +74,18 @@ const App = () => {
           <Route path="/profile" element={<ErrorBoundary><MyProfile /></ErrorBoundary>} />
           <Route path="/team" element={<ErrorBoundary><MyTeam /></ErrorBoundary>} />
           <Route path="/directories" element={<ErrorBoundary><Directories /></ErrorBoundary>} />
+          <Route path="/analytics" element={<ErrorBoundary><Analytics /></ErrorBoundary>} />
+          <Route path="/idp" element={<ErrorBoundary><IndividualDevelopmentPlan /></ErrorBoundary>} />
+          <Route path="/feedback360" element={<ErrorBoundary><Feedback360 /></ErrorBoundary>} />
+          <Route path="/knowledge" element={<ErrorBoundary><KnowledgeBase /></ErrorBoundary>} />
+          <Route path="/achievements" element={<ErrorBoundary><Achievements /></ErrorBoundary>} />
+          <Route path="/experts" element={<ErrorBoundary><ExpertsCatalog /></ErrorBoundary>} />
+          <Route path="/team-builder" element={<ErrorBoundary><TeamBuilder /></ErrorBoundary>} />
+          <Route path="/data-management" element={<ErrorBoundary><DataManagement /></ErrorBoundary>} />
+          <Route path="/notifications" element={<ErrorBoundary><Notifications /></ErrorBoundary>} />
         </Routes>
       </Container>
-    </Box>
+    </AppLayout>
   );
 };
 

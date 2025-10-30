@@ -10,7 +10,23 @@ export const STORAGE_KEYS = {
   PROFILES: 'availableProfiles', 
   CAREER_TRACKS: 'careerTracks',
   USER_PROFILE: 'userProfile',
-  TEAM_MEMBERS: 'teamMembers'
+  TEAM_MEMBERS: 'teamMembers',
+  EMPLOYEES: 'teamMembers',
+  DEVELOPMENT_PLANS: 'developmentPlans',
+  KNOWLEDGE_BASE: 'knowledgeBase',
+  ASSESSMENT_HISTORY: 'assessmentHistory',
+  ACHIEVEMENTS: 'achievements',
+  FEEDBACK_360: 'feedback360',
+  NOTIFICATIONS: 'notifications',
+  USER_SETTINGS: 'userSettings'
+};
+
+export const SKILL_COLORS = {
+  1: '#f44336',
+  2: '#ff9800',
+  3: '#2196f3',
+  4: '#4caf50',
+  5: '#9c27b0',
 };
 
 // Максимальное количество дополнительных профилей
